@@ -1,0 +1,41 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IntelliBlog - Dashboard</title>
+<link rel="stylesheet" href="css/style.css"><script src="js/app.js"></script></head>
+<body><header id="nav"></header><main class="wrap">
+<div class="stats"><div class="card"><b id="sT">0</b>Posts</div><div class="card"><b id="sP">0</b>Published</div><div class="card"><b id="sD">0</b>Drafts</div><div class="card"><b id="sV">0</b>Total views</div><div class="card"><b id="sL">0</b>Likes</div></div>
+<div class="stats" style="grid-template-columns:1fr 1fr"><div class="card"><h3>Posts by category</h3><div id="cat"></div></div><div class="card"><h3>🔥 Top posts</h3><div id="top"></div></div></div>
+<div class="card"><div class="row"><input type="search" placeholder="🔍 Search my posts..." oninput="clearTimeout(T);const v=this.value;T=setTimeout(()=>{S.q=v;S.page=0;list()},300)">
+<select onchange="S.st=this.value;S.page=0;list()"><option value="">All</option><option value="PUBLISHED">Published</option><option value="DRAFT">Drafts</option></select>
+<button onclick="openEd()">+ New post</button></div>
+<div style="overflow-x:auto"><table><thead><tr><th>Title</th><th>Category</th><th>Status</th><th>Views</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="pager"><button class="ghost sm" onclick="go(-1)">← Prev</button><span class="muted" id="pi"></span><button class="ghost sm" onclick="go(1)">Next →</button></div></div></main>
+<div class="modal hidden" id="ed"><div class="box"><h3 id="et">New post</h3><input id="e_t" placeholder="Title"><input id="e_c" placeholder="Category (e.g. Tech)"><input id="e_g" placeholder="Tags, comma separated (e.g. java, spring)"><input id="e_i" placeholder="Cover image URL (https://...) or upload one below"><input type="file" id="e_f" accept="image/*"><img id="e_p" class="cover hidden" style="max-height:140px" alt="">
+<textarea id="e_b" placeholder="Write your post. Markdown works: ## heading, **bold**, - list, `code`. Leave a blank line between paragraphs."></textarea><div class="row" style="margin:6px 0"><button class="ghost sm" onclick="aiRun('tags',this,r=>{$('e_g').value=r.replace(/[\n#]/g,'')})">✨ Suggest tags</button>
+<button class="ghost sm" onclick="aiRun('improve',this,r=>{if(confirm('Replace your text with the improved version?'))$('e_b').value=r})">✨ Improve writing</button></div><div class="err" id="ee"></div>
+<div class="row" style="justify-content:flex-end;margin:10px 0 0"><button class="ghost" onclick="$('ed').classList.add('hidden')">Cancel</button><button class="ghost" onclick="save('DRAFT')">Save draft</button><button onclick="save('PUBLISHED')">Publish</button></div></div></div>
+<script>
+if(!tok())location.replace('login.html');nav();
+let T,P=1,eid=null,S={q:'',st:'',page:0};
+async function stats(){const a=await api('/api/analytics');$('sT').textContent=a.total;$('sP').textContent=a.published;$('sD').textContent=a.drafts;$('sV').textContent=a.views;$('sL').textContent=a.likes;
+ const mx=Math.max(1,...Object.values(a.byCategory));$('cat').innerHTML=Object.entries(a.byCategory).map(([k,v])=>`<div class="bar"><span>${esc(k)}</span><i style="width:${v*100/mx}%"></i><b>${v}</b></div>`).join('')||'<p class="muted">No posts yet.</p>';
+ $('top').innerHTML=a.top.map(p=>`<div class="bar" style="grid-template-columns:1fr 60px"><a href="post.html?id=${p.id}">${esc(p.title)}</a><span class="muted">👁 ${p.views}</span></div>`).join('')||'<p class="muted">No views yet.</p>'}
+async function list(){const d=await api(`/api/posts?search=${encodeURIComponent(S.q)}&status=${S.st}&page=${S.page}&size=8`);P=d.pages||1;$('pi').textContent=`Page ${S.page+1} of ${P}`;
+ $('rows').innerHTML=d.items.map(p=>`<tr><td>${esc(p.title)}</td><td>${esc(p.category)}</td><td><span class="badge ${p.status}">${p.status}</span></td><td>${p.views}</td>
+ <td style="white-space:nowrap"><button class="sm ghost" onclick="edit(${p.id})">Edit</button> <button class="sm ghost" onclick="pub(${p.id})">${p.status==='PUBLISHED'?'Unpublish':'Publish'}</button> <button class="sm dan" onclick="del(${p.id})">Delete</button></td></tr>`).join('')||'<tr><td colspan="5" class="muted">No posts yet. Click "+ New post".</td></tr>'}
+const go=d=>{S.page=Math.min(Math.max(0,S.page+d),P-1);list()};
+function openEd(p){eid=p?p.id:null;$('et').textContent=p?'Edit post':'New post';$('ee').textContent='';$('e_t').value=p?p.title:'';$('e_c').value=p?p.category:'';
+ $('e_g').value=p?p.tags.split(',').filter(Boolean).join(', '):'';$('e_b').value=p?p.content:'';$('e_i').value=p?p.coverImage||'':'';preview();window.cur=p;$('ed').classList.remove('hidden')}
+async function edit(id){openEd(await api('/api/posts/'+id))}
+async function save(st){const b={title:$('e_t').value,category:$('e_c').value,tags:$('e_g').value,content:$('e_b').value,coverImage:$('e_i').value,status:st};
+ try{if(eid)await api('/api/posts/'+eid,'PUT',b);else await api('/api/posts','POST',b);$('ed').classList.add('hidden');toast(st==='PUBLISHED'?'Published':'Saved');refresh()}catch(e){$('ee').textContent=e.message}}
+async function pub(id){await api('/api/posts/'+id+'/publish','POST');refresh()}
+async function del(id){if(confirm('Delete this post?')){await api('/api/posts/'+id,'DELETE');toast('Deleted');refresh()}}
+function preview(){const v=$('e_i').value.trim();$('e_p').src=v;$('e_p').classList.toggle('hidden',!v)}
+$('e_i').oninput=preview;
+$('e_f').onchange=async ev=>{const f=ev.target.files[0];if(!f)return;const fd=new FormData();fd.append('file',f);
+ try{const r=await fetch('/api/upload',{method:'POST',headers:{Authorization:'Bearer '+tok()},body:fd});const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d.error||'Upload failed (max 5MB)');$('e_i').value=d.url;preview();toast('Image uploaded')}catch(e){toast(e.message,true)}};
+async function aiRun(a,btn,fn){const t=$('e_b').value.trim();if(!t){toast('Write some content first',true);return}const o=btn.textContent;btn.disabled=true;btn.textContent='Thinking...';
+ try{const d=await api('/api/ai/'+a,'POST',{text:t});fn(d.result)}catch(e){toast(e.message,true)}finally{btn.disabled=false;btn.textContent=o}}
+const refresh=()=>{stats().catch(e=>toast(e.message,true));list().catch(e=>toast(e.message,true))};refresh();
+if(location.search.includes('new'))openEd();
+</script></body></html>

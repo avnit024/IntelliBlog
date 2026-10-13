@@ -1,0 +1,3 @@
+# Copy this file to local.properties (it is git-ignored) and paste your key.
+# Free key: https://aistudio.google.com/apikey
+app.gemini.key=PASTE_YOUR_KEY_HERE

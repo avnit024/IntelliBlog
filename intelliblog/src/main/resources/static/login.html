@@ -1,0 +1,41 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IntelliBlog - Login</title>
+<link rel="stylesheet" href="css/style.css"><script src="js/app.js"></script></head>
+<body><header id="nav"></header>
+<div class="authwrap">
+ <div class="authhero"><h1>✍ IntelliBlog</h1><p>Write, publish and explore posts with AI summaries, translation and a built-in chatbot.</p>
+  <ul><li>🔐 Secure JWT login</li><li>📝 Drafts, publishing and analytics</li><li>✨ Powered by Gemini AI</li></ul></div>
+ <form class="card auth2" id="f" novalidate>
+  <div class="tabs"><button type="button" id="tl" class="on" onclick="mode(true)">Login</button><button type="button" id="tr" onclick="mode(false)">Register</button></div>
+  <input id="u" placeholder="Username" autocomplete="username" autofocus>
+  <div class="pw"><input id="p" type="password" placeholder="Password" autocomplete="current-password"><button type="button" onclick="$('p').type=$('p').type==='password'?'text':'password'">👁</button></div>
+  <div class="err" id="e"></div>
+  <button type="submit" id="go" style="width:100%">Login</button>
+ </form>
+</div>
+<script>
+nav();
+const dest=(()=>{const n=new URLSearchParams(location.search).get('next');return /^[a-z]+\.html$/.test(n||'')?n:'dashboard.html'})();
+let isLogin=true;
+addEventListener('DOMContentLoaded',()=>{if(new URLSearchParams(location.search).get('mode')==='register')mode(false)});
+
+// Already logged in? Verify the saved token really works before redirecting (a stale token must not trap this page).
+(async()=>{if(!tok())return;try{await api('/api/analytics');location.replace(dest)}catch(e){localStorage.removeItem('tok');localStorage.removeItem('me')}})();
+
+function mode(l){isLogin=l;$('tl').classList.toggle('on',l);$('tr').classList.toggle('on',!l);$('go').textContent=l?'Login':'Create account';$('e').textContent=''}
+
+$('f').addEventListener('submit',async ev=>{
+  ev.preventDefault();$('e').textContent='';
+  const username=$('u').value.trim(),password=$('p').value;
+  if(username.length<3){$('e').textContent='Username must be at least 3 characters';return}
+  if(password.length<4){$('e').textContent='Password must be at least 4 characters';return}
+  const btn=$('go'),label=btn.textContent;btn.disabled=true;btn.textContent='Please wait...';
+  try{
+    if(!isLogin)await api('/api/auth/register','POST',{username,password});
+    const d=await api('/api/auth/login','POST',{username,password});
+    if(!d.token)throw new Error('Login failed: no token received');
+    localStorage.setItem('tok',d.token);localStorage.setItem('me',d.username);
+    location.href=dest;
+  }catch(x){$('e').textContent=x.message}
+  finally{btn.disabled=false;btn.textContent=label}
+});
+</script></body></html>

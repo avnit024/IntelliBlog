@@ -1,0 +1,29 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IntelliBlog - Post</title>
+<link rel="stylesheet" href="css/style.css"><script src="js/app.js"></script></head>
+<body><div id="prog"></div><header id="nav"></header><main class="wrap">
+<article class="article" id="art"><p class="muted">Loading...</p></article>
+<div class="actions hidden" id="act"><button class="like" id="lk" onclick="like()">❤ <span id="lc">0</span></button><button class="ghost" onclick="navigator.clipboard.writeText(location.href);toast('Link copied')">🔗 Copy link</button></div>
+<div class="card sec hidden" id="aibox"><b>✨ AI tools</b> &nbsp;<button class="sm" onclick="ai('summarize')">Summarize</button>
+<select id="lang"><option>Hindi</option><option>Spanish</option><option>French</option><option>German</option><option>Japanese</option></select>
+<button class="sm" onclick="ai('translate')">Translate</button><div class="aiout" id="aiout"></div></div>
+<p class="muted" id="hint" style="text-align:center"><a href="login.html">Log in</a> to like, comment and use AI summaries, translation and the chatbot.</p>
+<div class="card sec"><h3>💬 Comments (<span id="cn">0</span>)</h3><div id="cf"></div><div id="cl"></div></div>
+<div class="sec hidden" id="relw"><h3>More in this category</h3><div class="related" id="rel"></div></div></main>
+<script>
+nav();chat();addEventListener('scroll',()=>{const h=document.documentElement;$('prog').style.width=(h.scrollTop/((h.scrollHeight-h.clientHeight)||1)*100)+'%'});let post;const id=new URLSearchParams(location.search).get('id');
+(async()=>{try{post=await api('/api/public/posts/'+id);window.chatCtx=post.title+'\n'+post.content;document.title=post.title;
+ $('art').innerHTML=`<span class="badge" style="--h:${hue(post.category)}">${esc(post.category)}</span><h1>${esc(post.title)}</h1><div class="muted">${esc(post.authorName)} · ${(post.publishedAt||'').slice(0,10)} · ⏱ ${readTime(post.content)} min read · 👁 ${post.views}
+ ${post.tags.split(',').filter(Boolean).map(t=>' #'+esc(t)).join('')}</div>${post.coverImage?`<img class="cover" src="${esc(post.coverImage)}" alt="" onerror="this.remove()">`:''}${md(post.content)}${post.sourceUrl?`<p><a class="btn" href="${esc(post.sourceUrl)}" target="_blank" rel="noopener">Read the full story at ${esc(post.sourceName)} →</a></p>`:''}`;
+ $('lc').textContent=post.likes;$('act').classList.remove('hidden');
+ if(tok()){$('aibox').classList.remove('hidden');$('hint').classList.add('hidden');api('/api/posts/'+id+'/like').then(d=>$('lk').classList.toggle('on',d.liked)).catch(()=>{})}
+ comments();related();
+}catch(e){$('art').innerHTML='<p class="err">'+esc(e.message)+'</p>'}})();
+async function like(){if(!tok()){toast('Log in to like posts',true);return}try{const d=await api('/api/posts/'+id+'/like','POST');$('lc').textContent=d.likes;$('lk').classList.toggle('on',d.liked)}catch(e){toast(e.message,true)}}
+async function comments(){const l=await api('/api/public/posts/'+id+'/comments');$('cn').textContent=l.length;
+ $('cf').innerHTML=tok()?'<textarea id="ct" style="min-height:70px" maxlength="500" placeholder="Add a comment..."></textarea><button class="sm" onclick="addC()">Post comment</button>':'';
+ $('cl').innerHTML=l.map(c=>`<div class="cmt"><b>${esc(c.authorName)}</b><span class="muted">${(c.createdAt||'').slice(0,10)}</span><div>${esc(c.text)}</div></div>`).join('')||'<p class="muted">No comments yet.</p>'}
+async function addC(){try{await api('/api/posts/'+id+'/comments','POST',{text:$('ct').value});toast('Comment added');comments()}catch(e){toast(e.message,true)}}
+async function related(){const d=await api('/api/public/posts?category='+encodeURIComponent(post.category)+'&size=4');const r=d.items.filter(p=>p.id!=id).slice(0,3);
+ if(r.length){$('rel').innerHTML=r.map(cardHtml).join('');$('relw').classList.remove('hidden')}}
+async function ai(a){$('aiout').textContent='Thinking...';try{$('aiout').textContent=(await api('/api/ai/'+a,'POST',{text:post.content,language:$('lang').value})).result}catch(e){$('aiout').textContent=e.message}}
+</script></body></html>

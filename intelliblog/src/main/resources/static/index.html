@@ -1,0 +1,37 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>IntelliBlog</title>
+<link rel="stylesheet" href="css/style.css"><script src="js/app.js"></script></head>
+<body><header id="nav"></header>
+<section class="hero"><h1>Ideas worth reading</h1><p>Search posts, filter by topic, and chat with AI about what you read.</p>
+<div class="toolbar"><input id="hq" type="search" placeholder="🔍 Search posts..." oninput="clearTimeout(T);const v=this.value;T=setTimeout(()=>{S.q=v;S.page=0;load()},300)">
+<select onchange="S.sort=this.value;S.page=0;load()"><option value="latest">Latest</option><option value="views">Most viewed</option><option value="likes">Most liked</option></select></div></section>
+<section class="wrap news"><div class="row" style="justify-content:space-between;margin:0"><h2>📰 Today's headlines</h2>
+<div><button class="ghost sm" onclick="briefing()">✨ AI briefing</button> <button class="ghost sm hidden" id="nrf" onclick="refreshNews()">🔄 Refresh news</button></div></div>
+<div class="muted" id="nup"></div><div class="card hidden" id="brief" style="white-space:pre-wrap;margin-top:12px"></div><div class="heads" id="heads"></div></section>
+<main class="wrap"><div id="feat"></div><div class="chips" id="cats"></div><div class="chips" id="tags"></div><div class="grid" id="posts"></div>
+<div class="pager"><button class="ghost" onclick="go(-1)">← Prev</button><span class="muted" id="pi"></span><button class="ghost" onclick="go(1)">Next →</button></div></main>
+<footer>© IntelliBlog · Built with Spring Boot, JWT and Gemini AI · Demo login: demo / demo123</footer>
+<script>
+nav();chat();
+let T,P=1,S={q:new URLSearchParams(location.search).get('q')||'',category:'',tag:'',sort:'latest',page:0};
+$('hq').value=S.q;
+function chips(el,obj,key,all,pre){el.innerHTML='';[['',all],...Object.keys(obj).map(k=>[k,pre+k+' ('+obj[k]+')'])].forEach(([v,l])=>{
+ const b=document.createElement('button');b.className='chip'+(S[key]===v?' on':'');b.textContent=l;b.onclick=()=>{S[key]=v;S.page=0;chips(el,obj,key,all,pre);load()};el.append(b)})}
+async function load(){
+ $('posts').innerHTML=Array(3).fill('<div class="card skel"></div>').join('');
+ const d=await api(`/api/public/posts?search=${encodeURIComponent(S.q)}&category=${encodeURIComponent(S.category)}&tag=${encodeURIComponent(S.tag)}&sort=${S.sort}&page=${S.page}&size=6`);
+ P=d.pages||1;$('pi').textContent=`Page ${S.page+1} of ${P} · ${d.total} post(s)`;
+ $('posts').innerHTML=d.items.map(cardHtml).join('')||'<p class="muted">No posts found.</p>'}
+async function feat(){try{const d=await api('/api/public/posts?sort=views&size=1');const p=d.items[0];if(!p)return;
+ $('feat').innerHTML=`<a class="feat" href="post.html?id=${p.id}">${p.coverImage?`<img src="${esc(p.coverImage)}" alt="" onerror="this.remove()">`:'<div></div>'}<div class="fb"><span class="badge" style="--h:${hue(p.category)}">⭐ Featured · ${esc(p.category)}</span><h2>${esc(p.title)}</h2><p>${esc(p.excerpt)}</p><div class="stat3"><span>${esc(p.authorName)}</span><span>👁 ${p.views}</span><span>❤ ${p.likes}</span></div></div></a>`}catch(e){}}
+async function news(){const d=await api('/api/public/news?size=8');window.HL=d.items;
+ $('nup').textContent=d.updatedAt?'Updated '+d.updatedAt.replace('T',' ').slice(0,16)+' · refreshes automatically every 3 hours':'Fetching the latest news... reload in a minute if this stays empty.';
+ $('heads').innerHTML=d.items.map(p=>`<a class="head" href="post.html?id=${p.id}">${p.coverImage?`<img src="${esc(p.coverImage)}" alt="" loading="lazy" onerror="this.remove()">`:''}<div><span class="badge" style="--h:${hue(p.category)}">${esc(p.category)}</span><b>${esc(p.title)}</b><small>${esc(p.sourceName)} · ${ago(p.publishedAt)}</small></div></a>`).join('')}
+async function refreshNews(){const b=$('nrf');b.disabled=true;b.textContent='Fetching...';try{const d=await api('/api/news/refresh','POST');toast(d.added+' new article(s)');news();load();feat()}catch(e){toast(e.message,true)}finally{b.disabled=false;b.textContent='🔄 Refresh news'}}
+async function briefing(){if(!tok()){toast('Log in to use the AI briefing',true);return}if(!window.HL||!window.HL.length){toast('No headlines yet',true);return}
+ const b=$('brief');b.classList.remove('hidden');b.textContent='Writing your briefing...';
+ try{b.textContent='✨ '+(await api('/api/ai/briefing','POST',{text:window.HL.map(p=>'- '+p.title+' ('+p.sourceName+')').join('\n')})).result}catch(e){b.textContent=e.message}}
+if(tok())$('nrf').classList.remove('hidden');
+news().catch(()=>{});
+const go=d=>{S.page=Math.min(Math.max(0,S.page+d),P-1);load()};
+(async()=>{try{const m=await api('/api/public/meta');chips($('cats'),m.categories,'category','All categories','');chips($('tags'),m.tags,'tag','All tags','#');await load();feat()}catch(e){$('posts').innerHTML='<p class="err">'+esc(e.message)+'</p>'}})();
+</script></body></html>
